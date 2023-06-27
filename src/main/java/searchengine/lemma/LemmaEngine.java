@@ -3,7 +3,7 @@ package searchengine.lemma;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import searchengine.config.LemmaConfiguration;
-import searchengine.dto.exception.CurrentRuntimeException;
+import searchengine.exception.CurrentRuntimeException;
 
 import java.io.IOException;
 import java.util.*;
@@ -12,22 +12,27 @@ import java.util.*;
 @Slf4j
 public record LemmaEngine(LemmaConfiguration lemmaConfiguration) {
 
+
     public Map<String, Integer> getLemmaMap(String text) {
         text = arrayContainsWords(text);
         Map<String, Integer> lemmaList = new HashMap<>();
         String[] elements = text.toLowerCase(Locale.ROOT).split("\\s+");
         List<String> wordsList;
         int count;
-        for (String el : elements) {
-            try {
-                wordsList = getLemma(el);
-            } catch (Exception e) {
-                throw new CurrentRuntimeException(e.getMessage());
+        try {
+
+
+            for (String el : elements) {
+
+                    wordsList = getLemma(el);
+
+                for (String word : wordsList) {
+                    count = lemmaList.getOrDefault(word, 0);
+                    lemmaList.put(word, count + 1);
+                }
             }
-            for (String word : wordsList) {
-                count = lemmaList.getOrDefault(word, 0);
-                lemmaList.put(word, count + 1);
-            }
+        } catch (Exception e){
+            throw new CurrentRuntimeException(e.getMessage());
         }
         return lemmaList;
     }
@@ -47,12 +52,7 @@ public record LemmaEngine(LemmaConfiguration lemmaConfiguration) {
     private boolean isCorrectWordForm(String word) throws IOException {
         List<String> morphForm = lemmaConfiguration.russianLuceneMorphology().getMorphInfo(word);
         for (String l : morphForm) {
-            if (l.contains("ПРЕДЛ") ||
-                    l.contains("СОЮЗ") ||
-                    l.contains("МЕЖД") ||
-                    l.contains("ВВОДН") ||
-                    l.contains("ЧАСТ") ||
-                    l.length() <= 3) {
+            if (l.contains("ПРЕДЛ") || l.contains("СОЮЗ") || l.contains("МЕЖД") || l.contains("ВВОДН") || l.contains("ЧАСТ") || l.length() <= 3) {
                 return true;
             }
         }
@@ -84,6 +84,7 @@ public record LemmaEngine(LemmaConfiguration lemmaConfiguration) {
                 .split("\\p{Punct}|\\s");
         int index = 0;
         List<String> lemmas;
+
         for (String el : elements) {
             lemmas = getLemma(el);
             for (String lem : lemmas) {
@@ -93,6 +94,7 @@ public record LemmaEngine(LemmaConfiguration lemmaConfiguration) {
             }
             index += el.length() + 1;
         }
+
         return lemmaIndexList;
     }
 }

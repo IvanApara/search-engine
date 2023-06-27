@@ -12,6 +12,7 @@ import java.io.Serializable;
 @EqualsAndHashCode
 public class IndexModel implements Serializable {
 
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;

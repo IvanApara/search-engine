@@ -19,27 +19,30 @@ import static org.springframework.security.crypto.password.NoOpPasswordEncoder.*
 @EnableGlobalMethodSecurity(prePostEnabled = true)
 public class SecurityConfiguration {
 
+    @Bean
     public InMemoryUserDetailsManager userDetailsManager(PasswordEncoder encoder) {
-        UserDetails admin = User
-                .withUsername("admin")
-                .password(encoder.encode("admin"))
-                .roles("admin", "user").build();
+       UserDetails admin = User
+               .withUsername("admin")
+               .password(encoder.encode("admin"))
+               .roles("admin", "user").build();
         UserDetails user = User
                 .withUsername("user")
                 .password(encoder.encode("user"))
                 .roles("user").build();
-        return new InMemoryUserDetailsManager(admin, user);
+       return new InMemoryUserDetailsManager(admin, user);
     }
 
+    @Bean
     public PasswordEncoder passwordEncoder() {
         return getInstance();
     }
 
+    @Bean
     protected SecurityFilterChain configure(HttpSecurity http) throws Exception {
-        return http
+         return http
                 .formLogin().permitAll().and().authorizeRequests().anyRequest().hasRole("admin")
-                .and()
-                .csrf().disable()
-                .build();
+                 .and()
+                 .csrf().disable()
+                 .build();
     }
 }

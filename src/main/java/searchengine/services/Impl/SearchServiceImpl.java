@@ -1,15 +1,15 @@
-package searchengine.services.search;
+package searchengine.services.Impl;
 
-import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import searchengine.dto.LemmaDto;
 import searchengine.dto.SearchDto;
-import searchengine.dto.exception.CurrentIOException;
+import searchengine.dto.response.ResultDTO;
+import searchengine.exception.CurrentIOException;
 import searchengine.lemma.LemmaEngine;
 import searchengine.model.IndexModel;
 import searchengine.model.LemmaModel;
@@ -18,6 +18,9 @@ import searchengine.model.SiteModel;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
+import searchengine.repository.SiteRepository;
+import searchengine.processing.SearchStarter;
+import searchengine.services.SearchService;
 
 import java.io.IOException;
 import java.util.*;
@@ -27,22 +30,18 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-@AllArgsConstructor
-public class SearchService {
-
-    private final LemmaEngine lemmaEngine;
-    private final LemmaRepository lemmaRepository;
-    private final PageRepository pageRepository;
-    private final IndexRepository indexRepository;
+public record SearchServiceImpl(LemmaEngine lemmaEngine, LemmaRepository lemmaRepository,
+                                PageRepository pageRepository, IndexRepository indexRepository)
+                                                                        implements SearchService {
 
     private List<SearchDto> getSearchDtoList(ConcurrentHashMap<PageModel, Float> pageList,
-                                             List<String> textLemmaList) throws CurrentIOException {
+                                             List<String> textLemmaList) {
         List<SearchDto> searchDtoList = new ArrayList<>();
         StringBuilder titleStringBuilder = new StringBuilder();
-        for (Map.Entry<PageModel, Float> page : pageList.entrySet()) {
-            String uri = page.getKey().getPath();
-            String content = page.getKey().getContent();
-            SiteModel pageSite = page.getKey().getSiteId();
+        for (PageModel page : pageList.keySet()) {
+            String uri = page.getPath();
+            String content = page.getContent();
+            SiteModel pageSite = page.getSiteId();
             String site = pageSite.getUrl();
             String siteName = pageSite.getName();
             String title = clearCodeFromTag(content, "title");
@@ -50,16 +49,13 @@ public class SearchService {
             titleStringBuilder.append(title).append(body);
             float pageValue = pageList.get(page);
             List<Integer> lemmaIndex = new ArrayList<>();
-            int i = 0;
-            while (i < textLemmaList.size()) {
+            for (int i = 0; i < textLemmaList.size(); i++) {
                 String lemma = textLemmaList.get(i);
                 try {
                     lemmaIndex.addAll(lemmaEngine.findLemmaIndexInText(titleStringBuilder.toString(), lemma));
                 } catch (IOException e) {
-                    log.debug(e.getMessage());
-                    throw new CurrentIOException(e.getMessage());
+                    new CurrentIOException(e.getMessage());
                 }
-                i++;
             }
             Collections.sort(lemmaIndex);
             StringBuilder snippetBuilder = new StringBuilder();
@@ -84,6 +80,7 @@ public class SearchService {
             int start = lemmaIndex.get(i);
             int end = content.indexOf(" ", start);
             int next = i + 1;
+
             while (next < lemmaIndex.size() && 0 < lemmaIndex.get(next) - end && lemmaIndex.get(next) - end < 5) {
                 end = content.indexOf(" ", lemmaIndex.get(next));
                 next += 1;
@@ -92,39 +89,24 @@ public class SearchService {
             String word = content.substring(start, end);
             int startIndex;
             int nextIndex;
+
             if (content.lastIndexOf(" ", start) != -1) {
                 startIndex = content.lastIndexOf(" ", start);
             } else startIndex = start;
-            if (content.indexOf(" ", (end + lemmaIndex.size() / (lemmaIndex.size() / 10))) != -1) {
-                nextIndex = content.indexOf(" ", end + lemmaIndex.size() / 10);
-            } else nextIndex = content.indexOf(" ", end);
-            String text = content.substring(startIndex, nextIndex).replaceAll(word, "<b>".concat(word).concat("</b>"));
-            result.add(text);
-            i++;
+                nextIndex = content.indexOf(" ", end);
+                String text = content.substring(startIndex, nextIndex).replaceAll(word, "<b>".concat(word).concat("</b>"));
+                result.add(text);
+                i++;
+
         }
         result.sort(Comparator.comparing(String::length).reversed());
         return result;
     }
 
     private Map<PageModel, Float> getRelevanceFromPage(List<PageModel> pageList,
-                                                       List<IndexModel> indexList) {
+                                                      List<IndexModel> indexList) {
         Map<PageModel, Float> relevanceMap = new HashMap<>();
-
-        int i = 0;
-        int j = 0;
-        while (i < pageList.size()) {
-            PageModel page = pageList.get(i);
-            float relevance = 0;
-            while (j < indexList.size()) {
-                IndexModel index = indexList.get(j);
-                if (index.getPage() == page) {
-                    relevance += index.getRank();
-                }
-                j++;
-            }
-            relevanceMap.put(page, relevance);
-            i++;
-        }
+        pageListBulkhead(pageList,indexList,relevanceMap);
 
         Map<PageModel, Float> allRelevanceMap = new HashMap<>();
 
@@ -137,15 +119,33 @@ public class SearchService {
         sortList.sort(Map.Entry.comparingByValue(Comparator.reverseOrder()));
         Map<PageModel, Float> map = new ConcurrentHashMap<>();
         Entry<PageModel, Float> pageModelFloatEntry;
-        int y = 0;
-        while (y < sortList.size()) {
-            pageModelFloatEntry = sortList.get(y);
+        for (int k = 0; k < sortList.size() ; k++) {
+            pageModelFloatEntry = sortList.get(k);
             map.putIfAbsent(pageModelFloatEntry.getKey(), pageModelFloatEntry.getValue());
-            y++;
         }
         return map;
     }
 
+    @Override
+    public Map<PageModel, Float>  pageListBulkhead(List<PageModel> pageList,List<IndexModel> indexList,
+                                                   Map<PageModel, Float> relevanceMap ){
+        for (int i = 0, j = 0; i < pageList.size();) {
+            PageModel page = pageList.get(i);
+            float relevance = 0;
+            while (j < indexList.size()) {
+                IndexModel index = indexList.get(j);
+                if (index.getPage() == page) {
+                    relevance += index.getRank();
+                }
+                j++;
+            }
+            relevanceMap.put(page, relevance);
+            i++;
+        }
+        return relevanceMap;
+    }
+
+    @Override
     public List<LemmaModel> getLemmaModelFromSite(List<String> lemmas, SiteModel site) {
         lemmaRepository.flush();
         List<LemmaModel> lemmaModels = lemmaRepository.findLemmaListBySite(lemmas, site);
@@ -154,7 +154,8 @@ public class SearchService {
         return result;
     }
 
-    public List<String> getLemmaFromSearchText(String text) throws CurrentIOException {
+    @Override
+    public List<String> getLemmaFromSearchText(String text) {
         String[] words = text.toLowerCase(Locale.ROOT).split(" ");
         List<String> lemmaList = new ArrayList<>();
         int i = 0;
@@ -165,17 +166,17 @@ public class SearchService {
                 list = lemmaEngine.getLemma(lemma);
                 lemmaList.addAll(list);
             } catch (IOException e) {
-                log.debug(e.getMessage());
-                throw new CurrentIOException(e.getMessage());
+                new CurrentIOException(e.getMessage());
             }
             i++;
         }
         return lemmaList;
     }
 
+    @Override
     public List<SearchDto> createSearchDtoList(List<LemmaModel> lemmaList,
                                                List<String> textLemmaList,
-                                               int start, int limit) throws CurrentIOException {
+                                               int start, int limit) {
         List<SearchDto> result = new ArrayList<>();
         pageRepository.flush();
         if (lemmaList.size() >= textLemmaList.size()) {
@@ -184,25 +185,51 @@ public class SearchService {
             List<IndexModel> indexesList = indexRepository.findByPageAndLemmas(lemmaList, pagesList);
             Map<PageModel, Float> relevanceMap = getRelevanceFromPage(pagesList, indexesList);
             List<SearchDto> searchDtos = getSearchDtoList((ConcurrentHashMap<PageModel, Float>) relevanceMap, textLemmaList);
+
             if (start > searchDtos.size()) {
                 return new ArrayList<>();
             }
             if (searchDtos.size() > limit) {
-                int i = start;
-                while (i < limit) {
-                    result.add(searchDtos.get(i));
-                    i++;
-                }
+                resultAdded(result,searchDtos,start,limit);
                 return result;
             } else return searchDtos;
 
         } else return result;
     }
 
-    public String clearCodeFromTag(String text, String element) {
+    @Override
+    public  String clearCodeFromTag(String text, String element) {
         Document doc = Jsoup.parse(text);
         Elements elements = doc.select(element);
         String html = elements.stream().map(Element::html).collect(Collectors.joining());
         return Jsoup.parse(html).text();
     }
+
+    @Override
+    public ResultDTO search(String query, String site, int offset,
+                            SiteRepository siteRepository, SearchStarter searchStarter){
+
+
+        List<SearchDto> searchData;
+        if (!site.isEmpty()) {
+            if (siteRepository.findByUrl(site) == null) {
+
+                return new ResultDTO(false, "Данная страница находится за пределами сайтов,\n" +
+                        "указанных в конфигурационном файле", HttpStatus.BAD_REQUEST) ;
+            } else {
+                searchData = searchStarter.getSearchFromOneSite(query, site, offset, 30);
+            }
+        } else {
+            searchData = searchStarter.getFullSearch(query, offset, 30);
+        }
+        return new ResultDTO(true, searchData.size(), searchData, HttpStatus.OK);
+    }
+
+    private List<SearchDto> resultAdded(List<SearchDto> result,List<SearchDto> searchDtos, int start, int limit ){
+        for (int i = start; i < limit; i++) {
+            result.add(searchDtos.get(i));
+        }
+        return result;
+    }
+
 }

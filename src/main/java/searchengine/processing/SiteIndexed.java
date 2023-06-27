@@ -1,4 +1,4 @@
-package searchengine.services.site;
+package searchengine.processing;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -7,7 +7,7 @@ import searchengine.config.SitesList;
 import searchengine.dto.IndexDto;
 import searchengine.dto.LemmaDto;
 import searchengine.dto.PageDto;
-import searchengine.dto.exception.CurrentInterruptedException;
+import searchengine.exception.CurrentInterruptedException;
 import searchengine.model.IndexModel;
 import searchengine.model.LemmaModel;
 import searchengine.model.PageModel;
@@ -17,9 +17,6 @@ import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
-import searchengine.services.index.WebParser;
-import searchengine.services.lemma.LemmaIndexer;
-import searchengine.services.pageconvertor.PageIndexer;
 
 import java.util.Date;
 import java.util.List;
@@ -53,37 +50,43 @@ public class SiteIndexed implements Callable<Boolean> {
         }
         log.info("Site indexing start ".concat(url).concat(" ").concat(getSiteName()) );
         SiteModelIndexing siteModelIndexing = new SiteModelIndexing();
-        SiteModel site = siteModelIndexing.saveSiteModelRecord();
+        SiteModel site = siteModelIndexing.getSiteModelRecord();
         try {
-            if (!Thread.interrupted()) {
-                List<PageDto> pageDtoList;
-                if (!Thread.interrupted()) {
-                    String urls = url.concat("/");
-                    List<PageDto> pageDtosList = new CopyOnWriteArrayList<>();
-                    List<String> urlList = new CopyOnWriteArrayList<>();
-                    ForkJoinPool forkJoinPool = new ForkJoinPool(Runtime.getRuntime().availableProcessors());
-                    List<PageDto> pages = forkJoinPool.invoke(new PageIndexer(urls,urlList, pageDtosList, sitesListConfiguration));
-                    pageDtoList = new CopyOnWriteArrayList<>(pages);
-                } else throw new CurrentInterruptedException("Fork join exception!");
-                List<PageModel> pageList = new CopyOnWriteArrayList<>();
-                int start;
-                String pagePath;
-                for (PageDto page : pageDtoList) {
-                    start = page.url().indexOf(url) + url.length();
-                    pagePath = page.url().substring(start);
-                    pageList.add(new PageModel(site, pagePath, page.code(), page.content()));
-                }
-                pageRepository.saveAllAndFlush(pageList);
-            } else {
-                throw new CurrentInterruptedException("Local interrupted exception.");
-            }
+            checkingTheInterruptedMethod(site);
             new LemmaIndexing().saveLemmasInLemmaDTO();
-            new AllSiteIndexing().saveSiteAllIndexing(site);
-        } catch (CurrentInterruptedException e) {
+            new AllSiteIndexing().getSiteAllIndexing(site);
+        } catch (Exception e) {
             log.error("WebParser stopped from ".concat(url).concat(". ").concat(e.getMessage()));
-            new SiteModelIndexing().saveErrorSiteModelRecord(site);
+            new SiteModelIndexing().getErrorSiteModelRecord(site);
+            new CurrentInterruptedException("Interrupted exception");
         }
         return true;
+    }
+
+
+    private void checkingTheInterruptedMethod(SiteModel site) throws Exception{
+        if (!Thread.interrupted()) {
+            List<PageDto> pageDtoList;
+            if (!Thread.interrupted()) {
+                String urls = url.concat("/");
+                List<PageDto> pageDtosList = new CopyOnWriteArrayList<>();
+                List<String> urlList = new CopyOnWriteArrayList<>();
+                ForkJoinPool forkJoinPool = new ForkJoinPool(Runtime.getRuntime().availableProcessors());
+                List<PageDto> pages = forkJoinPool.invoke(new PageIndexer(urls,urlList, pageDtosList, sitesListConfiguration));
+                pageDtoList = new CopyOnWriteArrayList<>(pages);
+            } else throw new CurrentInterruptedException("Fork join exception!");
+            List<PageModel> pageList = new CopyOnWriteArrayList<>();
+            int start;
+            String pagePath;
+            for (PageDto page : pageDtoList) {
+                start = page.url().indexOf(url) + url.length();
+                pagePath = page.url().substring(start);
+                pageList.add(new PageModel(site, pagePath, page.code(), page.content()));
+            }
+            pageRepository.saveAllAndFlush(pageList);
+        } else {
+            throw new CurrentInterruptedException("Local interrupted exception.");
+        }
     }
 
     private String getSiteName() {
@@ -95,7 +98,7 @@ public class SiteIndexed implements Callable<Boolean> {
     }
 
     private class SiteModelIndexing {
-        protected SiteModel saveSiteModelRecord() {
+        protected SiteModel getSiteModelRecord() {
             SiteModel site = new SiteModel();
             site.setUrl(url);
             site.setName(getSiteName());
@@ -105,7 +108,7 @@ public class SiteIndexed implements Callable<Boolean> {
             return site;
         }
 
-        protected void saveErrorSiteModelRecord(SiteModel site) {
+        protected void getErrorSiteModelRecord(SiteModel site) {
             SiteModel sites = new SiteModel();
             sites.setLastError("WebParser stopped");
             sites.setStatus(Status.FAILED);
@@ -134,7 +137,7 @@ public class SiteIndexed implements Callable<Boolean> {
     }
 
     private class AllSiteIndexing {
-        protected void saveSiteAllIndexing(SiteModel site) throws CurrentInterruptedException {
+        protected void getSiteAllIndexing(SiteModel site) throws CurrentInterruptedException {
             if (!Thread.interrupted()) {
                 webParser.startWebParser(site);
                 List<IndexDto> indexDtoList = new CopyOnWriteArrayList<>(webParser.getConfig());
@@ -152,6 +155,7 @@ public class SiteIndexed implements Callable<Boolean> {
                 site.setStatusTime(new Date());
                 site.setStatus(Status.INDEXED);
                 siteRepository.saveAndFlush(site);
+
             } else {
                 throw new CurrentInterruptedException("Invalid getSiteAllIndexing");
             }

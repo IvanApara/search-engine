@@ -9,13 +9,9 @@ import javax.sql.DataSource;
 
 @Configuration
 public class DataSourceBean {
-
-    @Value("${search.engine.db.password}")
-    private String dbPassword;
-    @Value("${search.engine.db.username}")
-    private String dbUserName;
-    @Value("${search.engine.db.url}")
-    private String dbUrl;
+    private @Value("${search.engine.db.password}") String dbPassword;
+    private @Value("${search.engine.db.username}") String dbUserName;
+    private @Value("${search.engine.db.url}") String dbUrl;
 
     @Bean
     public DataSource getDataSource() {

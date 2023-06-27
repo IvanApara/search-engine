@@ -1,4 +1,4 @@
-package searchengine.services.index;
+package searchengine.processing;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +21,6 @@ import searchengine.repository.PageRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Component
@@ -29,12 +28,11 @@ import java.util.stream.Collectors;
 @Slf4j
 @Getter
 public class WebParser {
-
     private final PageRepository pageRepository;
     private final LemmaRepository lemmaRepository;
     private final LemmaEngine lemmaEngine;
     private List<IndexDto> config;
-    private static final float RANK_COEF = 0.8f;
+    private final float RANK_COEF = 0.8f;
 
     public Void startWebParser(SiteModel site) {
         Iterable<PageModel> pageList = pageRepository.findBySiteId(site);
@@ -48,7 +46,7 @@ public class WebParser {
                 String body = clearCodeFromTag(content, "body");
                 Map<String, Integer> titleSiteList = lemmaEngine.getLemmaMap(title);
                 Map<String, Integer> bodySiteList = lemmaEngine.getLemmaMap(body);
-                lemmas(lemmaList, titleSiteList, bodySiteList, pageId);
+                addingLemmaDetailsList(lemmaList,titleSiteList,bodySiteList,pageId);
             } else {
                 log.debug("Bad status code - " + page.getCode());
             }
@@ -56,12 +54,12 @@ public class WebParser {
         return null;
     }
 
-    private void lemmas(List<LemmaModel> lemmaList, Map<String, Integer> titleSiteList, Map<String, Integer> bodySiteList,
+    private void addingLemmaDetailsList(List<LemmaModel> lemmaList, Map<String, Integer> titleSiteList, Map<String, Integer> bodySiteList,
                         long pageId) {
+        float totalRank = 0.0f;
+        float titleRank;
+        float bodyRank;
         for (LemmaModel lemma : lemmaList) {
-            float totalRank = 0.0f;
-            float titleRank;
-            float bodyRank;
             long lemmaId = lemma.getId();
             String keyWord = lemma.getLemma();
             if (titleSiteList.containsKey(keyWord) || bodySiteList.containsKey(keyWord)) {
@@ -79,6 +77,7 @@ public class WebParser {
             }
         }
     }
+
 
     public String clearCodeFromTag(String content, String s) {
         Document doc = Jsoup.parse(content);

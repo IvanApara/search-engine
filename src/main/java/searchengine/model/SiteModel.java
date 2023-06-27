@@ -16,7 +16,7 @@ import java.util.List;
 public class SiteModel implements Serializable {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
     @Enumerated(EnumType.STRING)
@@ -30,6 +30,7 @@ public class SiteModel implements Serializable {
 
     private String url;
 
+    @Column()
     private String name;
 
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "siteId", cascade = CascadeType.ALL)

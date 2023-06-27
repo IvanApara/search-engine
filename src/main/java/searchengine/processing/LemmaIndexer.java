@@ -1,4 +1,4 @@
-package searchengine.services.lemma;
+package searchengine.processing;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +22,6 @@ import java.util.stream.Collectors;
 @Slf4j
 @Getter
 public class LemmaIndexer {
-
     private final PageRepository pageRepository;
     private final LemmaEngine lemmaEngine;
     private List<LemmaDto> lemmaDtoList;
@@ -34,7 +33,7 @@ public class LemmaIndexer {
         Map<String, Integer> lemmaList = new TreeMap<>();
         Map<String, Integer> titleSiteList;
         Map<String, Integer> bodySiteList;
-        Set<String> allWordsInIndexingSite = new HashSet<>();
+        Set<String> allWordsInIndexingSite = new HashSet<>();;
         String content;
         String title;
         String body;
@@ -51,9 +50,10 @@ public class LemmaIndexer {
                 lemmaList.put(word, frequency);
             });
         }
-        for (Map.Entry<String, Integer> entry : lemmaList.entrySet()) {
-            String lemma = entry.getKey();
-            Integer frequency = entry.getValue();
+
+
+        for (String lemma : lemmaList.keySet()) {
+            Integer frequency = lemmaList.get(lemma);
             lemmaDtoList.add(new LemmaDto(lemma, frequency));
         }
     }

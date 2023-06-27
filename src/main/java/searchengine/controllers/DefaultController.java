@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 @Controller
 public record DefaultController() {
 
-    @ApiOperation("Open main page 'Index'")
+   @ApiOperation("Open main page 'Index'")
     @RequestMapping("/")
     public String index() {
         return "index";

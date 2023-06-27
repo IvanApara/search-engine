@@ -13,6 +13,7 @@ import java.util.List;
 @Table(name = "page")
 public class PageModel implements Serializable {
 
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
