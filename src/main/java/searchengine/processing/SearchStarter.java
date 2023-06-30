@@ -1,6 +1,7 @@
 package searchengine.processing;
 
 import org.springframework.stereotype.Service;
+import searchengine.config.Site;
 import searchengine.dto.SearchDto;
 import searchengine.model.LemmaModel;
 import searchengine.model.SiteModel;
@@ -37,18 +38,14 @@ public record SearchStarter(SiteRepository siteRepository, SearchServiceImpl sea
         }
 
         String[] arr = text.split(" ");
-
         List<SearchDto> searchData = new ArrayList<>();
-
-        for (String oneWord : arr) {
             for (LemmaModel l : foundLemmaList) {
-                if (l.getLemma().equals(oneWord)) {
+                if (l.getLemma().equals(arr[0])) {
                     searchData = (searchServiceImpl.createSearchDtoList(foundLemmaList, textLemmaList, start, limit));
                     searchData.sort((o1, o2) -> Float.compare(o2.relevance(), o1.relevance()));
                     checkSize(searchData, result, start, limit);
                 }
             }
-        }
         return searchData;
     }
 

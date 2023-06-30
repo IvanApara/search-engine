@@ -38,6 +38,7 @@ public record SearchServiceImpl(LemmaEngine lemmaEngine, LemmaRepository lemmaRe
                                              List<String> textLemmaList) {
         List<SearchDto> searchDtoList = new ArrayList<>();
         StringBuilder titleStringBuilder = new StringBuilder();
+
         for (PageModel page : pageList.keySet()) {
             String uri = page.getPath();
             String content = page.getContent();
@@ -49,58 +50,123 @@ public record SearchServiceImpl(LemmaEngine lemmaEngine, LemmaRepository lemmaRe
             titleStringBuilder.append(title).append(body);
             float pageValue = pageList.get(page);
             List<Integer> lemmaIndex = new ArrayList<>();
-            for (int i = 0; i < textLemmaList.size(); i++) {
-                String lemma = textLemmaList.get(i);
-                try {
-                    lemmaIndex.addAll(lemmaEngine.findLemmaIndexInText(titleStringBuilder.toString(), lemma));
-                } catch (IOException e) {
-                    new CurrentIOException(e.getMessage());
-                }
+
+            addedLemmaIndexInList(textLemmaList,lemmaIndex,titleStringBuilder);
+            if(lemmaIndex.size() == 0){
+                continue;
             }
             Collections.sort(lemmaIndex);
             StringBuilder snippetBuilder = new StringBuilder();
-            List<String> wordList = getWordsFromSiteContent(titleStringBuilder.toString(), lemmaIndex);
-            int y = 0;
-            while (y < wordList.size()) {
-                snippetBuilder.append(wordList.get(y)).append(".");
-                if (y > 3) {
-                    break;
-                }
-                y++;
+            List<String> wordList = getWordsFromSiteContent(titleStringBuilder.toString(), lemmaIndex,textLemmaList);
+
+            addedSnippetBuilder(wordList,snippetBuilder);
+            if(wordList.size() == 0){
+                continue;
             }
             searchDtoList.add(new SearchDto(site, siteName, uri, title, snippetBuilder.toString(), pageValue));
+            titleStringBuilder.setLength(0);
         }
-        return searchDtoList;
+        return searchDtoList.stream().distinct().collect(Collectors.toList());
     }
 
-    private List<String> getWordsFromSiteContent(String content, List<Integer> lemmaIndex) {
+    private void addedSnippetBuilder(List<String> wordList, StringBuilder snippetBuilder){
+        for (int y = 0; y < wordList.size(); y++) {
+            snippetBuilder.append(wordList.get(y)).append(".");
+            if (y > 3) {
+                break;
+            }
+        }
+    }
+
+    private void addedLemmaIndexInList(List<String> textLemmaList, List<Integer> lemmaIndex, StringBuilder titleStringBuilder){
+        for (int i = 0; i < textLemmaList.size(); i++) {
+            String lemma = textLemmaList.get(i);
+            try {
+                lemmaIndex.addAll(lemmaEngine.findLemmaIndexInText(titleStringBuilder.toString(), lemma));
+                if(lemmaIndex.size() == 0){
+                    break;
+                }
+            } catch (IOException e) {
+                new CurrentIOException(e.getMessage());
+            }
+        }
+    }
+
+    private List<String> getWordsFromSiteContent(String content, List<Integer> lemmaIndex,List<String> textLemmaList) {
         List<String> result = new ArrayList<>();
+        List<Integer> lemmaIndexCroppedText = new ArrayList<>();
+
         int i = 0;
         while (i < lemmaIndex.size()) {
             int start = lemmaIndex.get(i);
             int end = content.indexOf(" ", start);
-            int next = i + 1;
-
-            while (next < lemmaIndex.size() && 0 < lemmaIndex.get(next) - end && lemmaIndex.get(next) - end < 5) {
-                end = content.indexOf(" ", lemmaIndex.get(next));
-                next += 1;
-            }
-            i = next - 1;
             String word = content.substring(start, end);
-            int startIndex;
-            int nextIndex;
 
-            if (content.lastIndexOf(" ", start) != -1) {
-                startIndex = content.lastIndexOf(" ", start);
-            } else startIndex = start;
-                nextIndex = content.indexOf(" ", end);
-                String text = content.substring(startIndex, nextIndex).replaceAll(word, "<b>".concat(word).concat("</b>"));
-                result.add(text);
+            String textFinish = "";
+            if(start + 250 >= content.length() || start == 0){
+                textFinish += content.substring(start, content.length() - 1);
+            } else {
+                int textСroppingStart = content.lastIndexOf('.', start);
+                if (textСroppingStart < 0){
+                    textСroppingStart = content.lastIndexOf("", start);
+                }
+                int textСroppingEnd = textСroppingStart + 250;
+                textFinish += content.substring(textСroppingStart + 1, textСroppingEnd ).
+                        replaceFirst(",", "");
+            }
+                 String finishText = textFinish.replace(word, "<b>".concat(word).concat("</b>")).
+                         replace("[^А-Яа-я0-9,.]", "");
+            switch (finishText.length()){
+                case (250) -> finishText.substring(1,250);
+                default -> finishText.substring(1, finishText.length() - 1);
+            }
+
+            searchForTwoWordsInTheOutputText(textLemmaList,lemmaIndexCroppedText,textFinish);
+            if(lemmaIndexCroppedText.size() < 2 ){
                 i++;
-
+                continue;
+            } else {
+                result.add(finishText.replaceFirst("[)]", ""));
+                break;
+            }
         }
         result.sort(Comparator.comparing(String::length).reversed());
         return result;
+    }
+
+    public void searchForTwoWordsInTheOutputText(List<String> textLemmaList, List<Integer> lemmaIndexCroppedText,
+                                                 String textFinish) {
+        try {
+            for (int a = 0; a < textLemmaList.size(); a++) {
+                String lemmaOne = "";
+
+                if (lemmaIndexCroppedText.size() == 0) {
+                    lemmaOne = textLemmaList.get(a);
+                }
+
+                if (lemmaIndexCroppedText.size() > 0) {
+                    String lemmaTwo = textLemmaList.get(a);
+                    lemmaIndexCroppedText.addAll(lemmaEngine.findLemmaIndexInText(textFinish, lemmaTwo));
+                    if (lemmaIndexCroppedText.size() == 2) {
+                        break;
+                    }
+                    lemmaIndexCroppedText.clear();
+                    continue;
+                }
+                if (lemmaIndexCroppedText.size() == 0 && a == 0) {
+                    lemmaIndexCroppedText.addAll(lemmaEngine.findLemmaIndexInText(textFinish, lemmaOne));
+                    if (lemmaIndexCroppedText.size() == 1) {
+                        continue;
+                    }
+                    if (lemmaIndexCroppedText.size() > 1) {
+                        lemmaIndexCroppedText.clear();
+                    }
+                }
+
+            }
+        } catch (IOException e) {
+            new CurrentIOException(e.getMessage());
+        }
     }
 
     private Map<PageModel, Float> getRelevanceFromPage(List<PageModel> pageList,
@@ -180,6 +246,7 @@ public record SearchServiceImpl(LemmaEngine lemmaEngine, LemmaRepository lemmaRe
         List<SearchDto> result = new ArrayList<>();
         pageRepository.flush();
         if (lemmaList.size() >= textLemmaList.size()) {
+
             List<PageModel> pagesList = pageRepository.findByLemmaList(lemmaList);
             indexRepository.flush();
             List<IndexModel> indexesList = indexRepository.findByPageAndLemmas(lemmaList, pagesList);
@@ -209,7 +276,7 @@ public record SearchServiceImpl(LemmaEngine lemmaEngine, LemmaRepository lemmaRe
     public ResultDTO search(String query, String site, int offset,
                             SiteRepository siteRepository, SearchStarter searchStarter){
 
-
+        String lowerCase= query.toLowerCase();
         List<SearchDto> searchData;
         if (!site.isEmpty()) {
             if (siteRepository.findByUrl(site) == null) {
@@ -217,10 +284,10 @@ public record SearchServiceImpl(LemmaEngine lemmaEngine, LemmaRepository lemmaRe
                 return new ResultDTO(false, "Данная страница находится за пределами сайтов,\n" +
                         "указанных в конфигурационном файле", HttpStatus.BAD_REQUEST) ;
             } else {
-                searchData = searchStarter.getSearchFromOneSite(query, site, offset, 30);
+                searchData = searchStarter.getSearchFromOneSite(lowerCase, site, offset, 20);
             }
         } else {
-            searchData = searchStarter.getFullSearch(query, offset, 30);
+            searchData = searchStarter.getFullSearch(lowerCase, offset, 20);
         }
         return new ResultDTO(true, searchData.size(), searchData, HttpStatus.OK);
     }

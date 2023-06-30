@@ -14,7 +14,7 @@ spring:
     password: Rjdfk`df666222
   jpa:
     hibernate:
-      ddl-auto: create
+      ddl-auto: update
     show-sql: true
   mvc:
     path match:
@@ -24,10 +24,18 @@ indexing-settings:
   sites:
     - url: https://www.playback.ru
       name: PlayBack.Ru
-    - url: https://ipfran.ru/
+    - url: https://ipfran.ru
       name: pfran.ru
-    - url: https://www.svetlovka.ru/
+    - url: https://www.svetlovka.ru
       name: svetlovka.ru
+    - url: http://radiomv.ru
+      name: radiomv.ru
+    - url: https://et-cetera.ru
+      name: et-cetera.ru
+    - url: https://job.novgorod.ru/vacancy
+      name: www.novgorod.ru
+    - url: http://www.novjob.ru
+      name: novjob.ru
   userAgent: Mozilla/5.0 (Windows; U; WindowsNT 5.1; en-US; rv1.8.1.6) Gecko/20070725 Firefox/2.0.0.6
   referrer: http://www.google.com
 search:
