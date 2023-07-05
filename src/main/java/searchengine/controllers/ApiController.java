@@ -7,42 +7,44 @@ import org.springframework.web.bind.annotation.*;
 import searchengine.dto.response.ResultDTO;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.repository.SiteRepository;
-import searchengine.services.Impl.IndexingServiceImpl;
-import searchengine.services.Impl.StatisticsServiceImpl;
 import searchengine.processing.SearchStarter;
-import searchengine.services.Impl.SearchServiceImpl;
+import searchengine.services.IndexingService;
+import searchengine.services.SearchService;
+import searchengine.services.StatisticsService;
 
 
 @RestController
 @RequestMapping("/api")
 @Slf4j
-public record ApiController(StatisticsServiceImpl statisticsServiceImpl, IndexingServiceImpl indexingServiceImpl,
+public record ApiController(StatisticsService statisticsService, IndexingService indexingService,
                             SiteRepository siteRepository, SearchStarter searchStarter,
-                            SearchServiceImpl searchServiceImpl) {
+                            SearchService searchService) {
+
+
 
     @ApiOperation("Get all statistics")
     @GetMapping("/statistics")
     public ResponseEntity<StatisticsResponse> getStatistics() {
-        return ResponseEntity.ok(statisticsServiceImpl.getStatisticsResponse());
+        return ResponseEntity.ok(statisticsService.getStatisticsResponse());
     }
 
     @ApiOperation("Start parsing web")
     @GetMapping("/startIndexing")
     public ResultDTO startIndexing() {
-        return indexingServiceImpl.startIndexing();
+        return indexingService.startIndexing();
     }
 
     @ApiOperation("Stop parsing web")
     @GetMapping("/stopIndexing")
     public ResultDTO stopIndexing() {
         log.info("ОСТАНОВКА ИНДЕКСАЦИИ");
-        return indexingServiceImpl.stopIndexing();
+        return indexingService.stopIndexing();
     }
 
     @PostMapping("/indexPage")
     @ApiOperation("Индексация отдельной страницы")
     public ResultDTO indexPage(@RequestParam(name = "url") String url) {
-        return indexingServiceImpl.indexOnePage(url);
+        return indexingService.indexOnePage(url);
     }
 
 
@@ -52,7 +54,7 @@ public record ApiController(StatisticsServiceImpl statisticsServiceImpl, Indexin
     public ResultDTO search(@RequestParam(name = "query", required = false, defaultValue = "") String query,
                                       @RequestParam(name = "site", required = false, defaultValue = "") String site,
                                     @RequestParam(name = "offset", required = false, defaultValue = "0") int offset) {
-        return searchServiceImpl.search(query, site, offset, siteRepository, searchStarter);
+        return searchService.search(query, site, offset, siteRepository, searchStarter);
 
     }
 }

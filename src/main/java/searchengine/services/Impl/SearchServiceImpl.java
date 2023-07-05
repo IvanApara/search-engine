@@ -34,6 +34,8 @@ public record SearchServiceImpl(LemmaEngine lemmaEngine, LemmaRepository lemmaRe
                                 PageRepository pageRepository, IndexRepository indexRepository)
         implements SearchService {
 
+
+
     private List<SearchDto> getSearchDtoList(ConcurrentHashMap<PageModel, Float> pageList,
                                              List<String> textLemmaList) {
         List<SearchDto> searchDtoList = new ArrayList<>();
@@ -59,13 +61,7 @@ public record SearchServiceImpl(LemmaEngine lemmaEngine, LemmaRepository lemmaRe
             StringBuilder snippetBuilder = new StringBuilder();
             List<String> wordList = getWordsFromSiteContent(titleStringBuilder.toString(), lemmaIndex, textLemmaList);
 
-//            addedSnippetBuilder(wordList,snippetBuilder);
-            for (int y = 0; y < wordList.size(); y++) {
-                snippetBuilder.append(wordList.get(y)).append(".");
-                if (y > 3) {
-                    break;
-                }
-            }
+            addedSnippetBuilder(wordList,snippetBuilder);
             if (wordList.size() == 0) {
                 continue;
             }
@@ -105,13 +101,12 @@ public record SearchServiceImpl(LemmaEngine lemmaEngine, LemmaRepository lemmaRe
         int i = 0;
         while (i < lemmaIndex.size()) {
             int start = lemmaIndex.get(i);
-            int end = content.indexOf(" ", start);
-            String word = content.substring(start, end);
 
             String textFinish = "";
             if (start + 250 >= content.length() || start == 0) {
                 textFinish += content.substring(start, content.length() - 1);
             } else {
+
                 int textСroppingStart = content.lastIndexOf('.', start);
                 if (textСroppingStart < 0) {
                     textСroppingStart = content.lastIndexOf("", start);
@@ -121,186 +116,108 @@ public record SearchServiceImpl(LemmaEngine lemmaEngine, LemmaRepository lemmaRe
                         replaceFirst(",", "");
             }
 
-//            String finishText = "";
-//
-//            for (int j = 0; j < lemmaIndex.size(); j++) {
-//                start = lemmaIndex.get(j);
-//                end = content.indexOf(" ", start);
-//                String words = content.substring(start, end);
-//                finishText = textFinish.replace(words, "<b>".concat(words).concat("</b>")).
-//                         replace("[^А-Яа-я0-9,.]", "").replaceFirst("[)]", "").replaceAll("[()]", "");
-//
-////                        finishText.replaceFirst("[)]", "").replaceAll("[()]", "")
-////                        .replaceAll(words, "<b>".concat(words).concat("</b>"));
-//            }
-
             String finishText = textFinish.replace("[^А-Яа-я0-9,.]", "");
-//                    replace(word, "<b>".concat(word).concat("</b>")).
+
 
             switch (finishText.length()) {
                 case (250) -> finishText.substring(0, 250);
                 default -> finishText.substring(0, finishText.length() - 1);
             }
 
-////            String pipka = "Высмеиваемая тогда с революционной беспощадностью обывательская приспособленческая мораль " +
-//                    "становиться в наши дни пугающе знакома благодаря потугам весьма узнаваемых персонажей стать своими" +
-//                    "для власти и одновременным их ожиданиям что не сегодня з";
-//            String pipka = "Сегодня наши артисты посетили Госпиталь им Н.Н. Бурденко Вчера Александр Калягин открыл ";
 
-            try {
-                for (int a = 0; a < textLemmaList.size(); a++) {
-                    String lemmaOne = "";
-
-                    if (lemmaIndexCroppedText.size() == 0) {
-                        lemmaOne = textLemmaList.get(a);
-                    }
-
-                    if (lemmaIndexCroppedText.size() > 0) {
-                        int lenft = finishText.indexOf(" ", start);
-                        String lemmaTwo = textLemmaList.get(a);
-                        lemmaIndexCroppedText.addAll(lemmaEngine.findLemmaIndexInText(finishText, lemmaTwo));
-//                        if (textLemmaList.size() > 2) {
-//
-//                            //////////////
-////                            int indexFirst = finishText.indexOf(lemmaTwo);
-////                            int indexLast = finishText.indexOf(" ",indexFirst);
-////                            String newWord = finishText.substring(indexFirst,indexLast);
-////                            String endOfWord = finishText.replaceAll("^[^"+ lemmaTwo +"]*","" );
-////                            endOfWord = endOfWord.split(" ")[0];
-////                            String newWord = lemmaTwo.concat(endOfWord);
-//
-//                            /////////
-//
-//                            finishText = finishText.replaceAll(lemmaTwo, "<b>".concat(lemmaTwo).concat("</b>"));
-////                            finishText = finishText.replaceAll(lemmaTwo, "<b>".concat(lemmaTwo).concat("</b>"));
-//                        }
-                        if (lemmaIndexCroppedText.size() == 2) {
-                            if (textLemmaList.size() == 3) {
-                                if (a == 2 && lemmaIndexCroppedText.size() == 2) {
-                                    lemmaIndexCroppedText.clear();
-                                }
-                                continue;
-                            }
-                            break;
-                        }
-
-                        if (textLemmaList.size() == 3 && lemmaIndexCroppedText.size() == 3 && a == 2) {
-                            continue;
-                        }
-                        lemmaIndexCroppedText.clear();
-                        continue;
-                    }
-
-
-                    if (lemmaIndexCroppedText.size() == 0 && a == 0) {
-                        lemmaIndexCroppedText.addAll(lemmaEngine.findLemmaIndexInText(finishText, lemmaOne));
-                        if (lemmaIndexCroppedText.size() == 1) {
-                            continue;
-                        }
-                        if (lemmaIndexCroppedText.size() > 1) {
-                            lemmaIndexCroppedText.clear();
-                        }
-                    }
-
-                }
-
-
-//            searchForTwoWordsInTheOutputText(textLemmaList,lemmaIndexCroppedText,textFinish);
+            searchForWordsInTheOutputText(textLemmaList,lemmaIndexCroppedText,finishText);
                 if (lemmaIndexCroppedText.size() < 2 && textLemmaList.size() > 1 || textLemmaList.size() == 1 &&
                         lemmaIndexCroppedText.size() == 0) {
                     i++;
                     continue;
                 }else {
 
-if(lemmaIndexCroppedText.size() != 0){
-                    for (int j = 0; j <= lemmaIndexCroppedText.size(); j++) {
-
-                        int oneWordStart = lemmaIndexCroppedText.get(j);
-                        int oneWordEnd = finishText.indexOf(" ", oneWordStart);
-                        String word1 = finishText.substring(oneWordStart, oneWordEnd);
-
-                        if (lemmaIndexCroppedText.size() == 2 || lemmaIndexCroppedText.size() == 3) {
-                            int twoWordStart = lemmaIndexCroppedText.get(1);
-                            int twoWordEnd = finishText.indexOf(" ", twoWordStart);
-                            String word2 = finishText.substring(twoWordStart, twoWordEnd);
-
-                            if (lemmaIndexCroppedText.size() == 3) {
-                                int threeWordStart = lemmaIndexCroppedText.get(2);
-                                int threeWordEnd = finishText.indexOf(" ", threeWordStart);
-                                String word3 = finishText.substring(threeWordStart, threeWordEnd);
-                                finishText = finishText.replace(word1, "<b>".concat(word1).concat("</b>")).
-                                        replace(word2, "<b>".concat(word2).concat("</b>")).
-                                        replace(word3, "<b>".concat(word3).concat("</b>"));
-                                break;
-                            }
-
-                            finishText = finishText.replace(word1, "<b>".concat(word1).concat("</b>")).
-                                    replace(word2, "<b>".concat(word2).concat("</b>"));
-                            break;
-                        }
-
-                        finishText = finishText.replace(word1, "<b>".concat(word1).concat("</b>"));
-                        break;
-
-                    }
+                    if(lemmaIndexCroppedText.size() != 0){
+                        finishText = textSelection(lemmaIndexCroppedText,finishText);
                 }
-//                for (int c = 0; c < textLemmaList.size(); c++) {
-////                    String lemmaOne = textLemmaList.get(c);
-////                    text = finishText.replaceAll(lemmaOne, "<b>".concat(lemmaOne).concat("</b>").replaceFirst("[)]", "").replaceAll("[)]", ""));
-////                                    .replaceAll("[(]", ""));
-//                    for (int j = 0; j < lemmaIndex.size(); j++) {
-//                        start = lemmaIndex.get(j);
-//                        end = content.indexOf(" ", start);
-//                        String words = content.substring(start, end);
-//                        text = finishText.replaceAll(words, "<b>".concat(words).concat("</b>").replaceFirst("[)]", "").replaceAll("[)]", "")
-//                                .replaceAll("[(]", ""));
-//                    }
-//                }
                     result.add(finishText.replaceFirst("[)]", ""));
                     break;
                 }
-            } catch (IOException e) {
-                new CurrentIOException(e.getMessage());
-            }
+
         }
         result.sort(Comparator.comparing(String::length).reversed());
         return result;
     }
 
-//    public void searchForTwoWordsInTheOutputText(List<String> textLemmaList, List<Integer> lemmaIndexCroppedText,
-//                                                 String textFinish) {
-//        try {
-//            for (int a = 0; a < textLemmaList.size(); a++) {
-//                String lemmaOne = "";
-//
-//                if (lemmaIndexCroppedText.size() == 0) {
-//                    lemmaOne = textLemmaList.get(a);
-//                }
-//
-//                if (lemmaIndexCroppedText.size() > 0) {
-//                    String lemmaTwo = textLemmaList.get(a);
-//                    lemmaIndexCroppedText.addAll(lemmaEngine.findLemmaIndexInText(textFinish, lemmaTwo));
-//                    if (lemmaIndexCroppedText.size() == 2) {
-//                        break;
-//                    }
-//                    lemmaIndexCroppedText.clear();
-//                    continue;
-//                }
-//                if (lemmaIndexCroppedText.size() == 0 && a == 0) {
-//                    lemmaIndexCroppedText.addAll(lemmaEngine.findLemmaIndexInText(textFinish, lemmaOne));
-//                    if (lemmaIndexCroppedText.size() == 1) {
-//                        continue;
-//                    }
-//                    if (lemmaIndexCroppedText.size() > 1) {
-//                        lemmaIndexCroppedText.clear();
-//                    }
-//                }
-//
-//            }
-//        } catch (IOException e) {
-//            new CurrentIOException(e.getMessage());
-//        }
-//    }
+    public String textSelection(List<Integer> lemmaIndexCroppedText,String finishText ){
+        for (int j = 0; j <= lemmaIndexCroppedText.size(); j++) {
+
+            int oneWordStart = lemmaIndexCroppedText.get(j);
+            int oneWordEnd = finishText.indexOf(" ", oneWordStart);
+            String word1 = finishText.substring(oneWordStart, oneWordEnd);
+
+
+            if (lemmaIndexCroppedText.size() == 2 || lemmaIndexCroppedText.size() == 3) {
+                int twoWordStart = lemmaIndexCroppedText.get(1);
+                int twoWordEnd = finishText.indexOf(" ", twoWordStart);
+                String word2 = finishText.substring(twoWordStart, twoWordEnd);
+
+                if (lemmaIndexCroppedText.size() == 3) {
+                    int threeWordStart = lemmaIndexCroppedText.get(2);
+                    int threeWordEnd = finishText.indexOf(" ", threeWordStart);
+                    String word3 = finishText.substring(threeWordStart, threeWordEnd);
+                    finishText = finishText.replace(word1, "<b>".concat(word1).concat("</b>")).
+                            replace(word2, "<b>".concat(word2).concat("</b>")).
+                            replace(word3, "<b>".concat(word3).concat("</b>"));
+                    break;
+                }
+
+                finishText = finishText.replace(word1, "<b>".concat(word1).concat("</b>")).
+                        replace(word2, "<b>".concat(word2).concat("</b>"));
+                break;
+            }
+
+            finishText = finishText.replace(word1, "<b>".concat(word1).concat("</b>"));
+            break;
+
+        }
+        return finishText;
+    }
+    public void searchForWordsInTheOutputText(List<String> textLemmaList, List<Integer> lemmaIndexCroppedText,
+                                              String finishText) {
+        try {
+            for (int a = 0; a < textLemmaList.size(); a++) {
+                String lemmaOne = textLemmaList.get(a);
+
+                if (lemmaIndexCroppedText.size() > 0) {
+
+                    String lemmaTwo = textLemmaList.get(a);
+                    lemmaIndexCroppedText.addAll(lemmaEngine.findLemmaIndexInText(finishText, lemmaTwo));
+
+                    if (lemmaIndexCroppedText.size() == 2) {
+                        if (textLemmaList.size() == 3) {
+                            if (a == 2 && lemmaIndexCroppedText.size() == 2) {
+                                lemmaIndexCroppedText.clear();
+                            }
+                            continue;
+                        }
+                        break;
+                    }
+
+                    if (textLemmaList.size() == 3 && lemmaIndexCroppedText.size() == 3 && a == 2) {
+                        continue;
+                    }
+                    lemmaIndexCroppedText.clear();
+                    continue;
+                }
+
+                if (lemmaIndexCroppedText.size() == 0 && a == 0) {
+                    lemmaIndexCroppedText.addAll(lemmaEngine.findLemmaIndexInText(finishText, lemmaOne));
+                    if (lemmaIndexCroppedText.size() > 1) {
+                        lemmaIndexCroppedText.clear();
+                    }
+                    continue;
+                }
+            }
+        } catch (IOException e) {
+            new CurrentIOException(e.getMessage());
+        }
+    }
 
     private Map<PageModel, Float> getRelevanceFromPage(List<PageModel> pageList,
                                                        List<IndexModel> indexList) {
@@ -318,6 +235,7 @@ if(lemmaIndexCroppedText.size() != 0){
         sortList.sort(Map.Entry.comparingByValue(Comparator.reverseOrder()));
         Map<PageModel, Float> map = new ConcurrentHashMap<>();
         Entry<PageModel, Float> pageModelFloatEntry;
+
         for (int k = 0; k < sortList.size(); k++) {
             pageModelFloatEntry = sortList.get(k);
             map.putIfAbsent(pageModelFloatEntry.getKey(), pageModelFloatEntry.getValue());
